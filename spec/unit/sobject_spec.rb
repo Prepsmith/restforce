@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe Restforce::SObject do
@@ -22,8 +24,8 @@ describe Restforce::SObject do
         it { should be_a Restforce::Collection }
 
         describe 'each child' do
-          it { should be_all { |sobject| expect(sobject).to be_a Restforce::SObject } }
-          it { should be_all { |sobject| expect(sobject).to have_client client } }
+          it { should(be_all { |sobject| expect(sobject).to be_a Restforce::SObject }) }
+          it { should(be_all { |sobject| expect(sobject).to have_client client }) }
         end
       end
 
@@ -54,7 +56,7 @@ describe Restforce::SObject do
 
       context 'when an Id is present' do
         before do
-          hash.merge!(Id: '001D000000INjVe')
+          hash[:Id] = '001D000000INjVe'
           client.should_receive(receiver)
         end
 

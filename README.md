@@ -1,11 +1,9 @@
 # Restforce
 
-[![travis-ci](https://travis-ci.org/ejholmes/restforce.png?branch=master)](https://travis-ci.org/ejholmes/restforce) [![Code Climate](https://codeclimate.com/github/ejholmes/restforce.png)](https://codeclimate.com/github/ejholmes/restforce) [![Dependency Status](https://gemnasium.com/ejholmes/restforce.png)](https://gemnasium.com/ejholmes/restforce)
+[![CircleCI](https://circleci.com/gh/restforce/restforce.svg?style=svg)](https://circleci.com/gh/restforce/restforce) [![Code Climate](https://codeclimate.com/github/restforce/restforce.png)](https://codeclimate.com/github/restforce/restforce) [![Dependency Status](https://gemnasium.com/restforce/restforce.png)](https://gemnasium.com/restforce/restforce)
 ![](https://img.shields.io/gem/dt/restforce.svg)
 
 Restforce is a ruby gem for the [Salesforce REST api](http://www.salesforce.com/us/developer/docs/api_rest/index.htm).
-It's meant to be a lighter weight alternative to the [databasedotcom gem](https://github.com/heroku/databasedotcom) that offers
-greater flexibility and more advanced functionality.
 
 Features include:
 
@@ -21,13 +19,13 @@ Features include:
 * Support for dependent picklists.
 * Support for decoding [Force.com Canvas](http://www.salesforce.com/us/developer/docs/platform_connectpre/canvas_framework.pdf) signed requests. (NEW!)
 
-[Documentation](http://rubydoc.info/gems/restforce/frames) | [Changelog](https://github.com/ejholmes/restforce/tree/master/CHANGELOG.md)
+[Official Website](http://restforce.org/) | [Documentation](http://rubydoc.info/gems/restforce/frames) | [Changelog](https://github.com/restforce/restforce/tree/master/CHANGELOG.md)
 
 ## Installation
 
 Add this line to your application's Gemfile:
 
-    gem 'restforce'
+    gem 'restforce', '~> 3.0.1'
 
 And then execute:
 
@@ -37,7 +35,9 @@ Or install it yourself as:
 
     $ gem install restforce
 
-__As of [version 2.0.0](https://github.com/ejholmes/restforce/blob/master/CHANGELOG.md#200-jun-27-2015), this gem is only compatible with Ruby 1.9.3 and later.__ To use Ruby 1.9.2 and below, you'll need to manually specify that you wish to use version 1.5.3.
+__As of [version 3.0.0](https://github.com/restforce/restforce/blob/master/CHANGELOG.md#300-aug-2-2018), this gem is only compatible with Ruby 2.3.0 and later.__ You'll need to use version 2.5.3 or earlier if you're running on Ruby 2.2, 2.1 or 2.0. For Ruby 1.9.3, you'll need to manually specify that you wish to use version 2.4.2.
+
+This gem is versioned using [Semantic Versioning](http://semver.org/), so you can be confident when updating that there will not be breaking changes outside of a major version (following format MAJOR.MINOR.PATCH, so for instance moving from 3.1.0 to 4.0.0 would be allowed to include incompatible API changes). See the [changelog](https://github.com/restforce/restforce/tree/master/CHANGELOG.md) for details on what has changed in each version.
 
 ## Usage
 
@@ -56,29 +56,31 @@ If you're using the gem to interact with a single org (maybe you're building som
 salesforce integration internally?) then you should use the username/password
 authentication method.
 
-It is also important to note that the client object should not be reused across different threads, otherwise you may encounter thread-safety issues.
+It is also important to note that the client object should not be reused across different threads, otherwise you may encounter [thread-safety issues](https://www.youtube.com/watch?v=p5zQOkyCACc).
 
 #### OAuth token authentication
 
 ```ruby
-client = Restforce.new :oauth_token => 'access_token',
-  :instance_url  => 'instance url'
+client = Restforce.new(oauth_token: 'access_token',
+                       instance_url: 'instance url',
+                       api_version: '41.0')
 ```
 
 Although the above will work, you'll probably want to take advantage of the (re)authentication middleware by specifying `refresh_token`, `client_id`, `client_secret`, and `authentication_callback`:
 
 ```ruby
-client = Restforce.new :oauth_token => 'access_token',
-  :refresh_token           => 'refresh token',
-  :instance_url            => 'instance url',
-  :client_id               => 'client_id',
-  :client_secret           => 'client_secret',
-  :authentication_callback => Proc.new {|x| Rails.logger.debug x.to_s}
+client = Restforce.new(oauth_token: 'access_token',
+                       refresh_token: 'refresh token',
+                       instance_url: 'instance url',
+                       client_id: 'client_id',
+                       client_secret: 'client_secret',
+                       authentication_callback: Proc.new { |x| Rails.logger.debug x.to_s },
+                       api_version: '41.0')
 ```
 
 The middleware will use the `refresh_token` automatically to acquire a new `access_token` if the existing `access_token` is invalid.
 
-`authentication_callback` is a proc that handles the response from Salesforce when the `refresh_token` is used to obtain a new `access_token`. This allows the `access_token` to be saved for re-use later, otherwise subsequent API calls will continue the cycle of "auth failure/issue new access_token/auth success".
+`authentication_callback` is a proc that handles the response from Salesforce when the `refresh_token` is used to obtain a new `access_token`. This allows the `access_token` to be saved for re-use later - otherwise subsequent API calls will continue the cycle of "auth failure/issue new access_token/auth success".
 
 The proc is passed one argument, a `Hashie::Mash` of the response from the [Salesforce API](https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_understanding_refresh_token_oauth.htm):
 
@@ -101,15 +103,16 @@ The `id` field can be used to [uniquely identify](https://developer.salesforce.c
 If you prefer to use a username and password to authenticate:
 
 ```ruby
-client = Restforce.new :username => 'foo',
-  :password       => 'bar',
-  :security_token => 'security token',
-  :client_id      => 'client_id',
-  :client_secret  => 'client_secret'
+client = Restforce.new(username: 'foo',
+                       password: 'bar',
+                       security_token: 'security token',
+                       client_id: 'client_id',
+                       client_secret: 'client_secret',
+                       api_version: '41.0')
 ```
 
-You can also set the username, password, security token, client ID and client
-secret in environment variables:
+You can also set the username, password, security token, client ID, client
+secret and API version in environment variables:
 
 ```bash
 export SALESFORCE_USERNAME="username"
@@ -117,6 +120,7 @@ export SALESFORCE_PASSWORD="password"
 export SALESFORCE_SECURITY_TOKEN="security token"
 export SALESFORCE_CLIENT_ID="client id"
 export SALESFORCE_CLIENT_SECRET="client secret"
+export SALESFORCE_API_VERSION="41.0"
 ```
 
 ```ruby
@@ -128,12 +132,13 @@ client = Restforce.new
 You can specify a HTTP proxy using the `proxy_uri` option, as follows, or by setting the `SALESFORCE_PROXY_URI` environment variable:
 
 ```ruby
-client = Restforce.new :username => 'foo',
-  :password       => 'bar',
-  :security_token => 'security token',
-  :client_id      => 'client_id',
-  :client_secret  => 'client_secret',
-  :proxy_uri      => 'http://proxy.example.com:123'
+client = Restforce.new(username: 'foo',
+                       password: 'bar',
+                       security_token: 'security token',
+                       client_id: 'client_id',
+                       client_secret: 'client_secret',
+                       proxy_uri: 'http://proxy.example.com:123',
+                       api_version: '41.0')
 ```
 
 You may specify a username and password for the proxy with a URL along the lines of 'http://user:password@proxy.example.com:123'.
@@ -144,7 +149,7 @@ You can connect to sandbox orgs by specifying a host. The default host is
 'login.salesforce.com':
 
 ```ruby
-client = Restforce.new :host => 'test.salesforce.com'
+client = Restforce.new(host: 'test.salesforce.com')
 ```
 The host can also be set with the environment variable `SALESFORCE_HOST`.
 
@@ -161,25 +166,25 @@ end
 
 ### API versions
 
-By default, the gem defaults to using version 26.0 (Winter '13) of the Salesforce API.
-Some more recent API endpoints will not be available without moving to a more recent
-version - if you're trying to use a method that is unavailable with your API version,
+By default, the gem defaults to using Version 26.0 (Winter '13) of the Salesforce API. This maintains backwards compatibility for existing users.
+
+__We strongly suggest configuring Restforce to use the most recent API version, currently Version 41.0 (Winter '18) to get the best Salesforce API experience__ - for example, some more recently-added API endpoints will not be available without moving to a more recent
+version. If you're trying to use a method that is unavailable with your API version,
 Restforce will raise an `APIVersionError`.
 
-You can change the `api_version` setting from the default either on a per-client basis:
+There are three ways to set the API version:
 
-```ruby
-client = Restforce.new api_version: "32.0" # ...
-```
-
-or, you may set it globally for Restofrce as a whole:
+* Passing in an `api_version` option when instantiating `Restforce` (i.e. `Restforce.new(api_version: '41.0')`)
+* Setting the `SALESFORCE_API_VERSION` environment variable (i.e. `export SALESFORCE_API_VERSION="41.0"`)
+* Configuring the version globally with `Restforce.configure`:
 
 ```ruby
 Restforce.configure do |config|
-  config.api_version = "32.0"
+  config.api_version = '41.0'
   # ...
 end
 ```
+
 
 ### Bang! methods
 
@@ -188,6 +193,23 @@ a ! at the end (`create!`, `update!`, `upsert!`, `destroy!`), which can be used 
 to do some custom error handling. The bang methods will raise exceptions, while the
 non-bang methods will return false in the event that an exception is raised. This
 works similarly to ActiveRecord.
+
+
+### Custom Headers
+
+Salesforce allows the addition of
+[custom headers](https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/headers.htm)
+in REST API requests to trigger specific logic. In order to pass any custom headers along with API requests,
+you can specify a hash of `:request_headers`  upon client initialization. The example below demonstrates how
+to include the `sforce-auto-assign` header in all client HTTP requests:
+
+```ruby
+client = Restforce.new(oauth_token: 'access_token',
+                       instance_url: 'instance url',
+                       api_version: '41.0',
+                       request_headers: { 'sforce-auto-assign' => 'FALSE' })
+
+```
 
 * * *
 
@@ -338,7 +360,7 @@ client.picklist_values('Account', 'Type')
 # Given a custom object named Automobile__c with picklist fields
 # `Model__c` and `Make__c`, where options for `Model__c` depends on the value of
 # `Make__c`.
-client.picklist_values('Automobile__c', 'Model__c', :valid_for => 'Honda')
+client.picklist_values('Automobile__c', 'Model__c', valid_for: 'Honda')
 # => [#<Restforce::Mash label="Civic" value="Civic">, ... ]
 ```
 
@@ -374,7 +396,19 @@ Retrieves the list of individual record IDs that have been updated (added or cha
 
 ```ruby
 # Get the ids of all accounts which have been updated in the last day
-client.get_updated('Account', Time.local(2015,8,18) Time.local(2015,8,19))
+client.get_updated('Account', Time.local(2015,8,18), Time.local(2015,8,19))
+# => { ... }
+```
+
+* * *
+
+### get_deleted
+
+Retrieves the list of IDs and time of deletion for records that have been deleted within the given timespan for the specified object
+
+```ruby
+# Get the list of accounts which have been deleted in the last day
+client.get_deleted('Account', Time.local(2015,8,18), Time.local(2015,8,19))
 # => { ... }
 ```
 
@@ -405,33 +439,45 @@ info.user_id
 Using the new [Blob Data](http://www.salesforce.com/us/developer/docs/api_rest/Content/dome_sobject_insert_update_blob.htm) api feature (500mb limit):
 
 ```ruby
-client.create 'Document', FolderId: '00lE0000000FJ6H',
-  Description: 'Document test',
-  Name: 'My image',
-  Body: Restforce::UploadIO.new(File.expand_path('image.jpg', __FILE__), 'image/jpeg'))
+client.create('Document', FolderId: '00lE0000000FJ6H',
+                          Description: 'Document test',
+                          Name: 'My image',
+                          Body: Restforce::UploadIO.new(File.expand_path('image.jpg', __FILE__), 'image/jpeg')
 ```
 
 Using base64 encoded data (37.5mb limit):
 
 ```ruby
-client.create 'Document', FolderId: '00lE0000000FJ6H',
-  Description: 'Document test',
-  Name: 'My image',
-  Body: Base64::encode64(File.read('image.jpg'))
+client.create('Document', FolderId: '00lE0000000FJ6H',
+                          Description: 'Document test',
+                          Name: 'My image',
+                          Body: Base64::encode64(File.read('image.jpg'))
 ```
 
 _See also: [Inserting or updating blob data](http://www.salesforce.com/us/developer/docs/api_rest/Content/dome_sobject_insert_update_blob.htm)_
 
 * * *
 
-### Downloading Attachments
+### Downloading Attachments and Documents
 
-Restforce also makes it incredibly easy to download Attachments:
+Restforce also makes it incredibly easy to download Attachments or Documents:
 
+##### Attachments
 ```ruby
 attachment = client.query('select Id, Name, Body from Attachment').first
 File.open(attachment.Name, 'wb') { |f| f.write(attachment.Body) }
 ```
+##### Documents
+```ruby
+document = client.query('select Id, Name, Body from Document').first
+File.open(document.Name, 'wb') { |f| f.write(document.Body) }
+```
+
+**Note:** The example above is only applicable if your SOQL query returns a single Document record. If more than one record is returned, 
+the Body field contains an URL to retrieve the BLOB content for the first 2000 records returned. Subsequent records contain the BLOB content
+in the Body field. This is confusing and hard to debug. See notes in [Issue #301](https://github.com/restforce/restforce/issues/301#issuecomment-298972959) explaining this detail. 
+**Executive Summary:** Don't retrieve the Body field in a SOQL query; instead, use the BLOB retrieval URL documented 
+in [SObject BLOB Retrieve](https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/resources_sobject_blob_retrieve.htm) 
 
 * * *
 
@@ -459,7 +505,7 @@ global class RESTCaseController {
 Then you could query the cases using Restforce:
 
 ```ruby
-client.get '/services/apexrest/FieldCase', :company => 'GenePoint'
+client.get('/services/apexrest/FieldCase', company: 'GenePoint')
 # => #<Restforce::Collection ...>
 ```
 
@@ -475,28 +521,27 @@ pub/sub with Salesforce a trivial task:
 require 'faye'
 
 # Initialize a client with your username/password/oauth token/etc.
-client = Restforce.new :username => 'foo',
-  :password       => 'bar',
-  :security_token => 'security token'
-  :client_id      => 'client_id',
-  :client_secret  => 'client_secret'
+client = Restforce.new(username: 'foo',
+                       password: 'bar',
+                       security_token: 'security token'
+                       client_id: 'client_id',
+                       client_secret: 'client_secret')
 
 # Create a PushTopic for subscribing to Account changes.
-client.create! 'PushTopic', {
-  ApiVersion: '23.0',
-  Name: 'AllAccounts',
-  Description: 'All account records',
-  NotifyForOperations: 'All',
-  NotifyForFields: 'All',
-  Query: "select Id from Account"
-}
+client.create!('PushTopic',
+               ApiVersion: '23.0',
+               Name: 'AllAccounts',
+               Description: 'All account records',
+               NotifyForOperations: 'All',
+               NotifyForFields: 'All',
+               Query: "select Id from Account")
 
-EM.run {
+EM.run do
   # Subscribe to the PushTopic.
   client.subscribe 'AllAccounts' do |message|
     puts message.inspect
   end
-}
+end
 ```
 
 Boom, you're now receiving push notifications when Accounts are
@@ -514,7 +559,7 @@ The gem supports easy caching of GET requests (e.g. queries):
 
 ```ruby
 # rails example:
-client = Restforce.new cache: Rails.cache
+client = Restforce.new(cache: Rails.cache)
 
 # or
 Restforce.configure do |config|
@@ -530,6 +575,8 @@ client.without_caching do
   client.query('select Id from Account')
 end
 ```
+
+Caching is done on based on your authentication credentials, so cached responses will not be shared between different Salesforce logins.
 
 * * *
 
@@ -583,6 +630,16 @@ call `Restforce.tooling` instead of `Restforce.new`:
 client = Restforce.tooling(...)
 ```
 
+You can use the Tooling API to add fields to existing objects. For example, add "Twitter Username" to the default "Account" object:
+
+```ruby
+client = Restforce.tooling(...)
+client.create!("CustomField", {
+  "FullName" => "Account.orgnamespace__twitter_username__c",
+  "Metadata" => { type: "Text", label: "Twitter Username", length: 15 },
+})
+```
+
 ## Links
 
 If you need a full Active Record experience, may be you can use
@@ -590,38 +647,14 @@ If you need a full Active Record experience, may be you can use
 Restforce and adds Associations, Query Building (like AREL), Validations and
 Callbacks.
 
-## Development
-
-If you want to hack on Restforce locally, we try to make [bootstrapping the project](http://wynnnetherland.com/linked/2013012801/bootstrapping-consistency) as painless as possible. Just clone and run:
-
-```bash
-$ script/bootstrap
-```
-
-This will install project dependencies and get you up and running. If you want to run a Ruby console to poke on Restforce, you can crank one up with:
-
-```bash
-$ script/console
-```
-
-In order to run the specs, use:
-
-```bash
-$ script/test
-```
-
-Alternatively, use Guard which will run the specs on file changes:
-
-```bash
-$ script/guard
-```
-
-Using the scripts in `./script` instead of `bundle exec rspec`, `bundle console`, etc. ensures your dependencies are up-to-date.
-
 ## Contributing
+
+We welcome all contributions - they help us make Restforce the best gem possible.
+
+See our [CONTRIBUTING.md](https://github.com/restforce/restforce/blob/master/CONTRIBUTING.md) file for help with getting set up to work on the project locally.
 
 1. Fork it
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Added some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
-5. Create new Pull Request
+5. Create your Pull Request

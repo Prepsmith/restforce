@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe Restforce::Middleware::RaiseError do
@@ -14,6 +16,15 @@ describe Restforce::Middleware::RaiseError do
       it "raises an error" do
         expect { on_complete }.to raise_error Faraday::Error::ResourceNotFound,
                                               'INVALID_FIELD: error_message'
+      end
+    end
+
+    context 'when the status code is 300' do
+      let(:status) { 300 }
+
+      it "raises an error" do
+        expect { on_complete }.to raise_error Faraday::Error::ClientError,
+                                              /300: The external ID provided/
       end
     end
 
@@ -40,7 +51,7 @@ describe Restforce::Middleware::RaiseError do
 
       it "raises an error" do
         expect { on_complete }.to raise_error Faraday::Error::ClientError,
-                                              'HTTP 413 - Request Entity Too Large'
+                                              '413: Request Entity Too Large'
       end
     end
 

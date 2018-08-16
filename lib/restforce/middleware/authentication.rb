@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Restforce
   # Faraday middleware that allows for on the fly authentication of requests.
   # When a request fails (a status of 401 is returned), the middleware
@@ -22,16 +24,16 @@ module Restforce
         req.body = encode_www_form(params)
       end
 
-      if response.status != 200
+      if response.status >= 500
+        raise Restforce::ServerError, error_message(response)
+      elsif response.status != 200
         raise Restforce::AuthenticationError, error_message(response)
       end
 
       @options[:instance_url] = response.body['instance_url']
       @options[:oauth_token]  = response.body['access_token']
 
-      if @options[:authentication_callback]
-        @options[:authentication_callback].call(response.body)
-      end
+      @options[:authentication_callback]&.call(response.body)
 
       response.body
     end
@@ -48,9 +50,11 @@ module Restforce
         builder.use Restforce::Middleware::Mashify, nil, @options
         builder.response :json
 
-        builder.use Restforce::Middleware::Logger,
-                    Restforce.configuration.logger,
-                    @options if Restforce.log?
+        if Restforce.log?
+          builder.use Restforce::Middleware::Logger,
+                      Restforce.configuration.logger,
+                      @options
+        end
 
         builder.adapter @options[:adapter]
       end
@@ -79,7 +83,8 @@ module Restforce
 
     def faraday_options
       { url: "https://#{@options[:host]}",
-        proxy: @options[:proxy_uri] }.reject { |k, v| v.nil? }
+        proxy: @options[:proxy_uri],
+        ssl: @options[:ssl] }
     end
   end
 end

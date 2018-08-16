@@ -3,11 +3,13 @@
 inherit_from: .rubocop_todo.yml
 
 AllCops:
-  RunRailsCops: false
+  DisplayCopNames: true
   Include:
     - Rakefile
   Exclude:
     - .*/**/*
+    - vendor/**/*
+  TargetRubyVersion: 2.3
 
 # Limit lines to 80 characters.
 LineLength:
@@ -48,7 +50,7 @@ Style/SignalException:
   EnforcedStyle: 'only_raise'
 
 # Use trailing rather than leading dots on multi-line call chains
-Style/DotPosition:
+Layout/DotPosition:
   EnforcedStyle: trailing
 
 # Allow non-ASCII characters (e.g. £) in comments
@@ -56,5 +58,18 @@ Style/AsciiComments:
   Enabled: false
 
 # Allow method names beginning with capital letters to match Salesforce conventions
-Style/MethodName:
+Naming/MethodName:
+  Enabled: false
+
+Metrics/BlockLength:
+  Exclude:
+    - spec/**/*
+    - restforce.gemspec
+
+Naming/FileName:
+  Exclude:
+    - Gemfile
+    - Guardfile
+
+Lint/UriEscapeUnescape:
   Enabled: false

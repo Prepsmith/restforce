@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe Restforce::Concerns::Streaming, event_machine: true do
   describe '.subscribe' do
-    let(:channels)        { %w( channel1 channel2 ) }
+    let(:channels)        { %w[channel1 channel2] }
     let(:topics)          { channels.map { |c| "/topic/#{c}" } }
     let(:subscribe_block) { lambda { 'subscribe' } }
     let(:faye_double)     { double('Faye') }

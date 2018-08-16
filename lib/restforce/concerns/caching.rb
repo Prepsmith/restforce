@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Restforce
   module Concerns
     module Caching
@@ -6,9 +8,9 @@ module Restforce
       # block - A query/describe/etc.
       #
       # Returns the result of the block
-      def without_caching(&block)
+      def without_caching
         options[:use_cache] = false
-        block.call
+        yield
       ensure
         options.delete(:use_cache)
       end

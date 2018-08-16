@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe Restforce::Concerns::Connection do
@@ -34,7 +36,7 @@ describe Restforce::Concerns::Connection do
       describe 'with mashify not specified' do
         it 'includes the Mashify middleware' do
           client.middleware.handlers.index(Restforce::Middleware::Mashify).
-              should_not be_nil
+            should_not be_nil
         end
       end
 
@@ -45,7 +47,7 @@ describe Restforce::Concerns::Connection do
 
         it 'includes the Mashify middleware' do
           client.middleware.handlers.index(Restforce::Middleware::Mashify).
-              should_not be_nil
+            should_not be_nil
         end
       end
 
@@ -56,8 +58,24 @@ describe Restforce::Concerns::Connection do
 
         it 'does not include the Mashify middleware' do
           client.middleware.handlers.index(Restforce::Middleware::Mashify).
-              should be_nil
+            should be_nil
         end
+      end
+    end
+
+    describe ":logger option" do
+      let(:options) { { adapter: Faraday.default_adapter } }
+
+      before(:each) do
+        client.stub(:authentication_middleware)
+        client.stub(:cache)
+        client.stub(options: options)
+        Restforce.stub(log?: true)
+      end
+
+      it "must always be used last before the Faraday Adapter" do
+        client.middleware.handlers.reverse.index(Restforce::Middleware::Logger).
+          should eq 1
       end
     end
   end

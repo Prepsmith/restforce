@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 shared_examples_for Restforce::AbstractClient do
@@ -35,13 +37,24 @@ shared_examples_for Restforce::AbstractClient do
   end
 
   describe '.get_updated' do
-    let(:start_date) { Time.new(2015, 8, 17, 0, 0, 0, "+02:00")  }
+    let(:start_date) { Time.new(2015, 8, 17, 0, 0, 0, "+02:00") }
     let(:end_date) { Time.new(2016, 8, 19, 0, 0, 0, "+02:00") }
     end_string = '2016-08-18T22:00:00Z'
     start_string = '2015-08-16T22:00:00Z'
     requests "sobjects/Whizbang/updated/\\?end=#{end_string}&start=#{start_string}",
              fixture: 'sobject/get_updated_success_response'
     subject { client.get_updated('Whizbang', start_date, end_date) }
+    it { should be_an Enumerable }
+  end
+
+  describe '.get_deleted' do
+    let(:start_date) { Time.new(2015, 8, 17, 0, 0, 0, "+02:00") }
+    let(:end_date) { Time.new(2016, 8, 19, 0, 0, 0, "+02:00") }
+    end_string = '2016-08-18T22:00:00Z'
+    start_string = '2015-08-16T22:00:00Z'
+    requests "sobjects/Whizbang/deleted/\\?end=#{end_string}&start=#{start_string}",
+             fixture: 'sobject/get_deleted_success_response'
+    subject { client.get_deleted('Whizbang', start_date, end_date) }
     it { should be_an Enumerable }
   end
 
@@ -122,7 +135,7 @@ shared_examples_for Restforce::AbstractClient do
   describe '.update' do
     context 'with missing Id' do
       subject { lambda { client.update('Account', Name: 'Foobar') } }
-      it { should raise_error ArgumentError, 'Id field missing from attrs.' }
+      it { should raise_error ArgumentError, 'ID field missing from provided attributes' }
     end
 
     context 'with invalid Id' do
@@ -157,7 +170,8 @@ shared_examples_for Restforce::AbstractClient do
     context 'when updated' do
       requests 'sobjects/Account/External__c/foobar',
                method: :patch,
-               with_body: "{\"Name\":\"Foobar\"}"
+               with_body: "{\"Name\":\"Foobar\"}",
+               fixture: "sobject/upsert_updated_success_response"
 
       context 'with symbol external Id key' do
         subject do
@@ -368,11 +382,11 @@ shared_examples_for Restforce::AbstractClient do
 
     before do
       @query = stub_api_request('query\?q=SELECT%20some,%20fields%20FROM%20object').
-        with(headers: { 'Authorization' => "OAuth #{oauth_token}" }).
-        to_return(status: 401,
+               with(headers: { 'Authorization' => "OAuth #{oauth_token}" }).
+               to_return(status: 401,
                   body: fixture('expired_session_response'),
                   headers: { 'Content-Type' => 'application/json' }).then.
-        to_return(status: 200,
+               to_return(status: 200,
                   body: fixture('sobject/query_success_response'),
                   headers: { 'Content-Type' => 'application/json' })
 

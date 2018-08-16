@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 module Restforce
   class Middleware::Multipart < Faraday::Request::UrlEncoded
-    self.mime_type = 'multipart/form-data'.freeze
-    DEFAULT_BOUNDARY  = "--boundary_string".freeze
-    JSON_CONTENT_TYPE = { "Content-Type" => "application/json" }
+    self.mime_type = 'multipart/form-data'
+    DEFAULT_BOUNDARY  = "--boundary_string"
+    JSON_CONTENT_TYPE = { "Content-Type" => "application/json" }.freeze
 
     def call(env)
       match_content_type(env) do |params|
@@ -46,9 +48,10 @@ module Restforce
 
       # Files
       params.each do |k, v|
+        next unless v.respond_to? :content_type
         parts << Faraday::Parts::Part.new(boundary,
                                           k.to_s,
-                                          v) if v.respond_to? :content_type
+                                          v)
       end
 
       parts << Faraday::Parts::EpiloguePart.new(boundary)

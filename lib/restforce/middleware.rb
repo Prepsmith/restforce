@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Restforce
   # Base class that all middleware can extend. Provides some convenient helper
   # functions.
@@ -11,6 +13,7 @@ module Restforce
     autoload :Caching,        'restforce/middleware/caching'
     autoload :Logger,         'restforce/middleware/logger'
     autoload :Gzip,           'restforce/middleware/gzip'
+    autoload :CustomHeaders,  'restforce/middleware/custom_headers'
 
     def initialize(app, client, options)
       @app = app

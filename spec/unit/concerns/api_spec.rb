@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe Restforce::Concerns::API do
@@ -27,7 +29,23 @@ describe Restforce::Concerns::API do
     it 'returns the body' do
       start_string = '2002-10-31T00:02:02Z'
       end_string = '2003-10-31T00:02:02Z'
-      url = "/sobjects/Whizbang/updated/?start=#{start_string}&end=#{end_string}"
+      url = "sobjects/Whizbang/updated/?start=#{start_string}&end=#{end_string}"
+      client.should_receive(:api_get).
+        with(url).
+        and_return(response)
+      expect(results).to eq response.body
+    end
+  end
+
+  describe '.get_deleted' do
+    let(:start_date_time) { Time.new(2002, 10, 31, 2, 2, 2, "+02:00") }
+    let(:end_date_time) { Time.new(2003, 10, 31, 2, 2, 2, "+02:00") }
+    let(:sobject) { 'Whizbang' }
+    subject(:results) { client.get_deleted(sobject, start_date_time, end_date_time) }
+    it 'returns the body' do
+      start_string = '2002-10-31T00:02:02Z'
+      end_string = '2003-10-31T00:02:02Z'
+      url = "sobjects/Whizbang/deleted/?start=#{start_string}&end=#{end_string}"
       client.should_receive(:api_get).
         with(url).
         and_return(response)
@@ -243,7 +261,7 @@ describe Restforce::Concerns::API do
     end
   end
 
-  [:create, :update, :upsert, :destroy].each do |method|
+  %i[create update upsert destroy].each do |method|
     describe ".#{method}" do
       let(:args)       { [] }
       subject(:result) { client.send(method, *args) }
@@ -266,64 +284,172 @@ describe Restforce::Concerns::API do
     end
   end
 
-  describe '.create!' do
-    let(:sobject)    { 'Whizbang' }
-    let(:attrs)      { Hash.new }
-    subject(:result) { client.create!(sobject, attrs) }
-
-    it 'send an HTTP POST, and returns the id of the record' do
-      response.body.stub(:[]).with('id').and_return('1234')
-      client.should_receive(:api_post).
-        with('sobjects/Whizbang', attrs).
-        and_return(response)
-      expect(result).to eq '1234'
+  context 'methods with attrs' do
+    before do
+      attrs.freeze
     end
-  end
 
-  describe '.update!' do
-    let(:sobject)    { 'Whizbang' }
-    let(:attrs)      { Hash.new }
-    subject(:result) { client.update!(sobject, attrs) }
+    describe '.create!' do
+      let(:sobject)    { 'Whizbang' }
+      let(:attrs)      { {} }
+      subject(:result) { client.create!(sobject, attrs) }
 
-    context 'when the id field is present' do
-      let(:attrs) { { id: '1234', StageName: "Call Scheduled" } }
-
-      it 'sends an HTTP PATCH, and returns true' do
-        client.should_receive(:api_patch).
-          with('sobjects/Whizbang/1234', StageName: "Call Scheduled")
-        expect(result).to be_true
+      it 'send an HTTP POST, and returns the id of the record' do
+        response.body.stub(:[]).with('id').and_return('1234')
+        client.should_receive(:api_post).
+          with('sobjects/Whizbang', attrs).
+          and_return(response)
+        expect(result).to eq '1234'
       end
     end
 
-    context 'when the id field is missing from the attrs' do
-      subject { lambda { result } }
-      it { should raise_error ArgumentError, 'Id field missing from attrs.' }
-    end
-  end
+    describe '.update!' do
+      let(:sobject)    { 'Whizbang' }
+      let(:attrs)      { {} }
+      subject(:result) { client.update!(sobject, attrs) }
 
-  describe '.upsert!' do
-    let(:sobject)    { 'Whizbang' }
-    let(:field)      { :External_ID__c }
-    let(:attrs)      { { 'External_ID__c' => '1234' } }
-    subject(:result) { client.upsert!(sobject, field, attrs) }
+      context 'when the id field is present' do
+        let(:attrs) { { id: '1234', StageName: "Call Scheduled" } }
 
-    context 'when the record is found and updated' do
-      it 'returns true' do
-        response.body.stub :[]
-        client.should_receive(:api_patch).
-          with('sobjects/Whizbang/External_ID__c/1234', {}).
-          and_return(response)
-        expect(result).to be_true
+        it 'sends an HTTP PATCH, and returns true' do
+          client.should_receive(:api_patch).
+            with('sobjects/Whizbang/1234', StageName: "Call Scheduled")
+          expect(result).to be_true
+        end
+      end
+
+      context 'when the id field contains special characters' do
+        let(:attrs) { { id: '1234/?abc', StageName: "Call Scheduled" } }
+
+        it 'sends an HTTP PATCH, and encodes the ID' do
+          client.should_receive(:api_patch).
+            with('sobjects/Whizbang/1234%2F%3Fabc', StageName: "Call Scheduled")
+          expect(result).to be_true
+        end
+      end
+
+      context 'when the id field is missing from the attrs' do
+        it "raises an error" do
+          expect { client.update!(sobject, attrs) }.
+            to raise_error(ArgumentError, 'ID field missing from provided attributes')
+        end
       end
     end
 
-    context 'when the record is found and created' do
-      it 'returns the id of the record' do
-        response.body.stub(:[]).with('id').and_return('4321')
-        client.should_receive(:api_patch).
-          with('sobjects/Whizbang/External_ID__c/1234', {}).
-          and_return(response)
-        expect(result).to eq '4321'
+    describe '.upsert!' do
+      let(:sobject)    { 'Whizbang' }
+      let(:field)      { :External_ID__c }
+      let(:attrs)      { { 'External_ID__c' => '1234' } }
+      subject(:result) { client.upsert!(sobject, field, attrs) }
+
+      context 'when the record is found and updated' do
+        it 'returns true' do
+          response.stub(:body) { {} }
+          client.should_receive(:api_patch).
+            with('sobjects/Whizbang/External_ID__c/1234', {}).
+            and_return(response)
+          expect(result).to be_true
+        end
+
+        context 'and the response body is a string' do
+          it 'returns true' do
+            response.stub(:body) { '' }
+            client.should_receive(:api_patch).
+              with('sobjects/Whizbang/External_ID__c/1234', {}).
+              and_return(response)
+            expect(result).to be_true
+          end
+        end
+      end
+
+      context 'when the record is found and created' do
+        it 'returns the id of the record' do
+          response.stub(:body) { { "id" => "4321" } }
+          client.should_receive(:api_patch).
+            with('sobjects/Whizbang/External_ID__c/1234', {}).
+            and_return(response)
+          expect(result).to eq '4321'
+        end
+      end
+
+      context 'when the external id field is missing from the attrs' do
+        let(:attrs) { {} }
+
+        it 'raises an argument error' do
+          expect { client.upsert!(sobject, field, attrs) }.
+            to raise_error ArgumentError, 'Specified external ID field missing from ' \
+                                          'provided attributes'
+        end
+      end
+
+      context 'when using Id as the attribute' do
+        let(:field) { :Id }
+        let(:attrs) { { 'Id' => '4321' } }
+
+        context 'and the value for Id is provided' do
+          it 'returns the id of the record, and original record still contains id' do
+            response.stub(:body) { { "id" => "4321" } }
+            client.should_receive(:api_patch).
+              with('sobjects/Whizbang/Id/4321', {}).
+              and_return(response)
+            expect(result).to eq '4321'
+            expect(attrs).to include('Id' => '4321')
+          end
+        end
+
+        context 'and no value for Id is provided' do
+          let(:attrs) { { 'External_ID__c' => '1234' } }
+
+          it 'uses POST to create the record' do
+            response.stub(:body) { { "id" => "4321" } }
+            client.should_receive(:options).and_return(api_version: 38.0)
+            client.should_receive(:api_post).
+              with('sobjects/Whizbang/Id', attrs).
+              and_return(response)
+            expect(result).to eq '4321'
+          end
+
+          it 'guards functionality for unsupported API versions' do
+            client.should_receive(:options).and_return(api_version: 35.0)
+            expect do
+              client.upsert!(sobject, field, attrs)
+            end.to raise_error Restforce::APIVersionError
+          end
+        end
+      end
+    end
+
+    describe '.upsert! with multi bytes character' do
+      let(:sobject)    { 'Whizbang' }
+      let(:field)      { :External_ID__c }
+      let(:attrs)      { { 'External_ID__c' => "\u{3042}" } }
+      subject(:result) { client.upsert!(sobject, field, attrs) }
+
+      context 'when the record is found and updated' do
+        it 'returns true' do
+          response.stub(:body) { {} }
+          client.should_receive(:api_patch).
+            with('sobjects/Whizbang/External_ID__c/%E3%81%82', {}).
+            and_return(response)
+          expect(result).to be_true
+        end
+      end
+    end
+
+    describe '.upsert! with Fixnum argument' do
+      let(:sobject)    { 'Whizbang' }
+      let(:field)      { :External_ID__c }
+      let(:attrs)      { { 'External_ID__c' => 1234 } }
+      subject(:result) { client.upsert!(sobject, field, attrs) }
+
+      context 'when the record is found and updated' do
+        it 'returns true' do
+          response.stub(:body) { {} }
+          client.should_receive(:api_patch).
+            with('sobjects/Whizbang/External_ID__c/1234', {}).
+            and_return(response)
+          expect(result).to be_true
+        end
       end
     end
   end
@@ -337,6 +463,16 @@ describe Restforce::Concerns::API do
       client.should_receive(:api_delete).
         with('sobjects/Whizbang/1234')
       expect(result).to be_true
+    end
+
+    context 'when the id field contains special characters' do
+      let(:id) { '1234/?abc' }
+
+      it 'sends an HTTP delete, and encodes the ID' do
+        client.should_receive(:api_delete).
+          with('sobjects/Whizbang/1234%2F%3Fabc')
+        expect(result).to be_true
+      end
     end
   end
 
@@ -361,6 +497,27 @@ describe Restforce::Concerns::API do
       it 'returns the full representation of the object' do
         client.should_receive(:api_get).
           with('sobjects/Whizbang/External_ID__c/1234').
+          and_return(response)
+        expect(result).to eq response.body
+      end
+    end
+
+    context 'when an external id which contains multibyte characters is specified' do
+      let(:field) { :External_ID__c }
+      let(:id)    { "\u{3042}" }
+      it 'returns the full representation of the object' do
+        client.should_receive(:api_get).
+          with('sobjects/Whizbang/External_ID__c/%E3%81%82').
+          and_return(response)
+        expect(result).to eq response.body
+      end
+    end
+
+    context 'when an internal ID which contains special characters is specified' do
+      let(:id)    { "1234/?abc" }
+      it 'returns the full representation of the object' do
+        client.should_receive(:api_get).
+          with('sobjects/Whizbang/1234%2F%3Fabc').
           and_return(response)
         expect(result).to eq response.body
       end
@@ -412,6 +569,38 @@ describe Restforce::Concerns::API do
             and_return(response)
           expect(result).to eq response.body
         end
+      end
+    end
+
+    context 'when an external id which contains multibyte characters is specified' do
+      let(:field) { :External_ID__c }
+      let(:id) { "\u{3042}" }
+      context 'when no select list is specified' do
+        it 'returns the full representation of the object' do
+          client.should_receive(:api_get).
+            with('sobjects/Whizbang/External_ID__c/%E3%81%82').
+            and_return(response)
+          expect(result).to eq response.body
+        end
+      end
+      context 'when select list is specified' do
+        let(:select) { [:External_ID__c] }
+        it 'returns the full representation of the object' do
+          client.should_receive(:api_get).
+            with('sobjects/Whizbang/External_ID__c/%E3%81%82?fields=External_ID__c').
+            and_return(response)
+          expect(result).to eq response.body
+        end
+      end
+    end
+
+    context 'when an internal ID which contains special characters is specified' do
+      let(:id)    { "1234/?abc" }
+      it 'returns the full representation of the object' do
+        client.should_receive(:api_get).
+          with('sobjects/Whizbang/1234%2F%3Fabc').
+          and_return(response)
+        expect(result).to eq response.body
       end
     end
   end

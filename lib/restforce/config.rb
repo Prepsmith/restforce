@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'logger'
 
 module Restforce
@@ -60,7 +62,7 @@ module Restforce
       private
 
       attr_reader :default
-      alias_method :default_provided?, :default
+      alias default_provided? default
 
       def write_attribute
         configuration.send :attr_accessor, name
@@ -88,7 +90,7 @@ module Restforce
       end
     end
 
-    option :api_version, default: '26.0'
+    option :api_version, default: lambda { ENV['SALESFORCE_API_VERSION'] || '26.0' }
 
     # The username to use during login.
     option :username, default: lambda { ENV['SALESFORCE_USERNAME'] }
@@ -140,6 +142,9 @@ module Restforce
 
     # Set SSL options
     option :ssl, default: {}
+
+    # A Hash that is converted to HTTP headers
+    option :request_headers
 
     # Set a logger for when Restforce.log is set to true, defaulting to STDOUT
     option :logger, default: ::Logger.new(STDOUT)

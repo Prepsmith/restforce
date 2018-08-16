@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Restforce
   class Collection
     include Enumerable
@@ -29,7 +31,7 @@ module Restforce
     def size
       @raw_page['totalSize']
     end
-    alias_method :length, :size
+    alias length size
 
     # Return array of the elements on the current page
     def current_page

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe Restforce::Concerns::Authentication do
@@ -54,7 +56,7 @@ describe Restforce::Concerns::Authentication do
 
   describe '.username_password?' do
     subject       { client.username_password? }
-    let(:options) { Hash.new }
+    let(:options) { {} }
 
     before do
       client.stub options: options
@@ -78,7 +80,7 @@ describe Restforce::Concerns::Authentication do
 
   describe '.oauth_refresh?' do
     subject       { client.oauth_refresh? }
-    let(:options) { Hash.new }
+    let(:options) { {} }
 
     before do
       client.stub options: options

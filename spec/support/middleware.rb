@@ -1,7 +1,9 @@
+# frozen_string_literal: true
+
 module MiddlewareExampleGroup
   def self.included(base)
     base.class_eval do
-      let(:app)            { double('@app', call: nil)            }
+      let(:app)            { double('@app', call: nil) }
       let(:env)            { { request_headers: {}, response_headers: {} } }
       let(:retries)        { 3 }
       let(:options)        { {} }

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'faraday'
 require 'faraday_middleware'
 require 'json'
@@ -11,6 +13,7 @@ module Restforce
   autoload :Collection,     'restforce/collection'
   autoload :Middleware,     'restforce/middleware'
   autoload :Attachment,     'restforce/attachment'
+  autoload :Document,       'restforce/document'
   autoload :UploadIO,       'restforce/upload_io'
   autoload :SObject,        'restforce/sobject'
   autoload :Client,         'restforce/client'
@@ -37,6 +40,7 @@ module Restforce
   end
 
   Error               = Class.new(StandardError)
+  ServerError         = Class.new(Error)
   AuthenticationError = Class.new(Error)
   UnauthorizedError   = Class.new(Error)
   APIVersionError     = Class.new(Error)

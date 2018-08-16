@@ -1,3 +1,6 @@
+# frozen_string_literal: true
+
+require 'uri'
 require 'restforce/concerns/verbs'
 
 module Restforce
@@ -80,7 +83,27 @@ module Restforce
       def get_updated(sobject, start_time, end_time)
         start_time = start_time.utc.iso8601
         end_time = end_time.utc.iso8601
-        url = "/sobjects/#{sobject}/updated/?start=#{start_time}&end=#{end_time}"
+        url = "sobjects/#{sobject}/updated/?start=#{start_time}&end=#{end_time}"
+        api_get(url).body
+      end
+
+      # Public: Gets the IDs of sobjects of type [sobject]
+      # which have been deleted between startDateTime and endDateTime.
+      #
+      # Examples
+      #
+      #   # get deleted sobject Whizbangs between yesterday and today
+      #   startDate = Time.new(2002, 10, 31, 2, 2, 2, "+02:00")
+      #   endDate = Time.new(2002, 11, 1, 2, 2, 2, "+02:00")
+      #   client.get_deleted('Whizbang', startDate, endDate)
+      #
+      # Returns a Restforce::Collection if Restforce.configuration.mashify is true.
+      # Returns an Array of Hash for each record in the result if
+      # Restforce.configuration.mashify is false.
+      def get_deleted(sobject, start_time, end_time)
+        start_time = start_time.utc.iso8601
+        end_time = end_time.utc.iso8601
+        url = "sobjects/#{sobject}/deleted/?start=#{start_time}&end=#{end_time}"
         api_get(url).body
       end
 
@@ -126,7 +149,7 @@ module Restforce
       def describe_layouts(sobject, layout_id = nil)
         version_guard(28.0) do
           if layout_id
-            api_get("sobjects/#{sobject}/describe/layouts/#{layout_id}").body
+            api_get("sobjects/#{sobject}/describe/layouts/#{CGI.escape(layout_id)}").body
           else
             api_get("sobjects/#{sobject}/describe/layouts").body
           end
@@ -244,7 +267,7 @@ module Restforce
       rescue *exceptions
         false
       end
-      alias_method :insert, :create
+      alias insert create
 
       # Public: Insert a new record.
       #
@@ -262,7 +285,7 @@ module Restforce
       def create!(sobject, attrs)
         api_post("sobjects/#{sobject}", attrs).body['id']
       end
-      alias_method :insert!, :create!
+      alias insert! create!
 
       # Public: Update a record.
       #
@@ -295,10 +318,10 @@ module Restforce
       # Returns true if the sobject was successfully updated.
       # Raises an exception if an error is returned from Salesforce.
       def update!(sobject, attrs)
-        id = attrs.fetch(attrs.keys.find { |k, v| k.to_s.downcase == 'id' }, nil)
-        raise ArgumentError, 'Id field missing from attrs.' unless id
-        attrs_without_id = attrs.reject { |k, v| k.to_s.downcase == "id" }
-        api_patch "sobjects/#{sobject}/#{id}", attrs_without_id
+        id = attrs.fetch(attrs.keys.find { |k, v| k.to_s.casecmp('id').zero? }, nil)
+        raise ArgumentError, 'ID field missing from provided attributes' unless id
+        attrs_without_id = attrs.reject { |k, v| k.to_s.casecmp("id").zero? }
+        api_patch "sobjects/#{sobject}/#{CGI.escape(id)}", attrs_without_id
         true
       end
 
@@ -315,7 +338,8 @@ module Restforce
       #
       # Returns true if the record was found and updated.
       # Returns the Id of the newly created record if the record was created.
-      # Returns false if something bad happens.
+      # Returns false if something bad happens (for example if the external ID matches
+      # multiple resources).
       def upsert(*args)
         upsert!(*args)
       rescue *exceptions
@@ -335,16 +359,28 @@ module Restforce
       #
       # Returns true if the record was found and updated.
       # Returns the Id of the newly created record if the record was created.
-      # Raises an exception if an error is returned from Salesforce.
+      # Raises an exception if an error is returned from Salesforce, including the 300
+      # error returned if the external ID provided matches multiple records (in which
+      # case the conflicting IDs can be found by looking at the response on the error)
       def upsert!(sobject, field, attrs)
-        external_id = attrs.
-          fetch(attrs.keys.find { |k, v| k.to_s.downcase == field.to_s.downcase }, nil)
-        attrs_without_field = attrs.
-          reject { |k, v| k.to_s.downcase == field.to_s.downcase }
-        response = api_patch "sobjects/#{sobject}/#{field}/#{external_id}",
-                             attrs_without_field
+        attrs = attrs.dup
+        external_id =
+          extract_case_insensitive_string_or_symbol_key_from_hash!(attrs, field).to_s
+        if field.to_s != "Id" && (external_id.nil? || external_id.strip.empty?)
+          raise ArgumentError, 'Specified external ID field missing from provided ' \
+                               'attributes'
+        end
 
-        (response.body && response.body['id']) ? response.body['id'] : true
+        response =
+          if field.to_s == "Id" && (external_id.nil? || external_id.strip.empty?)
+            version_guard(37.0) do
+              api_post "sobjects/#{sobject}/#{field}", attrs
+            end
+          else
+            api_patch "sobjects/#{sobject}/#{field}/#{CGI.escape(external_id)}", attrs
+          end
+
+        response.body.respond_to?(:fetch) ? response.body.fetch('id', true) : true
       end
 
       # Public: Delete a record.
@@ -378,7 +414,7 @@ module Restforce
       # Returns true of the sobject was successfully deleted.
       # Raises an exception if an error is returned from Salesforce.
       def destroy!(sobject, id)
-        api_delete "sobjects/#{sobject}/#{id}"
+        api_delete "sobjects/#{sobject}/#{CGI.escape(id)}"
         true
       end
 
@@ -391,7 +427,11 @@ module Restforce
       #
       # Returns the Restforce::SObject sobject record.
       def find(sobject, id, field = nil)
-        url = field ? "sobjects/#{sobject}/#{field}/#{id}" : "sobjects/#{sobject}/#{id}"
+        url = if field
+                "sobjects/#{sobject}/#{field}/#{CGI.escape(id)}"
+              else
+                "sobjects/#{sobject}/#{CGI.escape(id)}"
+              end
         api_get(url).body
       end
 
@@ -405,8 +445,13 @@ module Restforce
       # field   - External ID field to use (default: nil).
       #
       def select(sobject, id, select, field = nil)
-        path = field ? "sobjects/#{sobject}/#{field}/#{id}" : "sobjects/#{sobject}/#{id}"
-        path << "?fields=#{select.join(',')}" if select && select.any?
+        path = if field
+                 "sobjects/#{sobject}/#{field}/#{CGI.escape(id)}"
+               else
+                 "sobjects/#{sobject}/#{CGI.escape(id)}"
+               end
+
+        path = "#{path}?fields=#{select.join(',')}" if select&.any?
 
         api_get(path).body
       end
@@ -535,6 +580,14 @@ module Restforce
                                  "see https://github.com/ejholmes/restforce/blob/master" \
                                  "/README.md#api-versions"
         end
+      end
+
+      def extract_case_insensitive_string_or_symbol_key_from_hash!(hash, key)
+        value = hash.delete(key.to_sym)
+        value ||= hash.delete(key.to_s)
+        value ||= hash.delete(key.to_s.downcase)
+        value ||= hash.delete(key.to_s.downcase.to_sym)
+        value
       end
 
       # Internal: Errors that should be rescued from in non-bang methods

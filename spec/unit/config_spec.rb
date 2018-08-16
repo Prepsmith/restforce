@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe Restforce do
@@ -7,6 +9,7 @@ describe Restforce do
     ENV['SALESFORCE_SECURITY_TOKEN'] = nil
     ENV['SALESFORCE_CLIENT_ID']      = nil
     ENV['SALESFORCE_CLIENT_SECRET']  = nil
+    ENV['SALESFORCE_API_VERSION']    = nil
   end
 
   after do
@@ -24,9 +27,9 @@ describe Restforce do
       its(:authentication_retries) { should eq 3 }
       its(:adapter)                { should eq Faraday.default_adapter }
       its(:ssl)                    { should eq({}) }
-      [:username, :password, :security_token, :client_id, :client_secret,
-       :oauth_token, :refresh_token, :instance_url, :compress, :timeout,
-       :proxy_uri, :authentication_callback, :mashify].each do |attr|
+      %i[username password security_token client_id client_secret
+         oauth_token refresh_token instance_url compress timeout
+         proxy_uri authentication_callback mashify request_headers].each do |attr|
         its(attr) { should be_nil }
       end
     end
@@ -39,8 +42,9 @@ describe Restforce do
           'SALESFORCE_CLIENT_ID'      => 'client id',
           'SALESFORCE_CLIENT_SECRET'  => 'client secret',
           'SALESFORCE_PROXY_URI'      => 'proxy',
-          'SALESFORCE_HOST'           => 'test.host.com' }.
-        each { |var, value| ENV.stub(:[]).with(var).and_return(value) }
+          'SALESFORCE_HOST'           => 'test.host.com',
+          'SALESFORCE_API_VERSION'    => '37.0' }.
+          each { |var, value| ENV.stub(:[]).with(var).and_return(value) }
       end
 
       its(:username)       { should eq 'foo' }
@@ -50,14 +54,15 @@ describe Restforce do
       its(:client_secret)  { should eq 'client secret' }
       its(:proxy_uri)      { should eq 'proxy' }
       its(:host)           { should eq 'test.host.com' }
+      its(:api_version)    { should eq '37.0' }
     end
   end
 
   describe '#configure' do
-    [:username, :password, :security_token, :client_id, :client_secret, :compress,
-     :timeout, :oauth_token, :refresh_token, :instance_url, :api_version, :host, :mashify,
-     :authentication_retries, :proxy_uri, :authentication_callback, :ssl, :log_level,
-     :logger].each do |attr|
+    %i[username password security_token client_id client_secret compress
+       timeout oauth_token refresh_token instance_url api_version host mashify
+       authentication_retries proxy_uri authentication_callback ssl
+       request_headers log_level logger].each do |attr|
       it "allows #{attr} to be set" do
         Restforce.configure do |config|
           config.send("#{attr}=", 'foobar')
